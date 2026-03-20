@@ -1,0 +1,155 @@
+import anthropic
+import base64
+import json
+from pathlib import Path
+from app.config import settings
+
+client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+PROMPT_EXTRACCION = """Eres un asistente especializado en leer facturas electrónicas peruanas (SUNAT).
+Analiza el PDF adjunto y extrae TODOS los datos con máxima precisión.
+
+Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto adicional, sin markdown):
+
+{
+  "confianza_general": 95,
+  "tipo_documento": "factura",
+  "proveedor": {
+    "ruc": "20613675281",
+    "razon_social": "GRUPO RIALVA S.A.C.",
+    "direccion": "...",
+    "telefono": "...",
+    "email": "..."
+  },
+  "numero_factura": "F001-00002894",
+  "fecha_emision": "2026-03-03",
+  "fecha_vencimiento": "2026-03-03",
+  "moneda": "PEN",
+  "condicion_pago": "Contado",
+  "op_gravada": 2677.12,
+  "op_inafecta": 0.00,
+  "op_exonerada": 0.00,
+  "igv": 481.88,
+  "total": 3159.00,
+  "items": [
+    {
+      "linea": 1,
+      "codigo_producto": "",
+      "descripcion": "KG. DE. CAUCHO. GRANULADO",
+      "unidad": "NIU",
+      "cantidad": 1700,
+      "precio_unit_con_igv": 1.86,
+      "precio_unit_sin_igv": 1.57,
+      "subtotal": 3159.00,
+      "confianza_campo": 98
+    }
+  ],
+  "campos_baja_confianza": []
+}
+
+REGLAS IMPORTANTES:
+- tipo_documento: "factura", "recibo_honorarios", "boleta" u "otro"
+- fechas en formato YYYY-MM-DD
+- montos como números decimales (sin símbolo S/ ni comas de miles)
+- Si un campo no existe en el documento, usar null
+- precio_unit_con_igv = precio que aparece en columna P.UNIT de la factura
+- precio_unit_sin_igv = precio en columna SIN IGV (si existe), si no: calcular dividiendo entre 1.18
+- confianza_general: 0-100 según qué tan legible y completo está el documento
+- confianza_campo por ítem: 0-100 según legibilidad de esa línea específica
+- campos_baja_confianza: lista de nombres de campos con confianza < 70
+"""
+
+async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
+    """
+    Extrae datos estructurados de una factura PDF usando Claude API.
+    Funciona para PDFs digitales y escaneados.
+    """
+    pdf_base64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+
+    try:
+        message = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=4096,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_base64,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": PROMPT_EXTRACCION
+                        }
+                    ],
+                }
+            ],
+        )
+
+        respuesta_texto = message.content[0].text.strip()
+
+        # Limpiar markdown si la IA lo incluyó
+        if respuesta_texto.startswith("```"):
+            lineas = respuesta_texto.split("\n")
+            respuesta_texto = "\n".join(lineas[1:-1])
+
+        datos = json.loads(respuesta_texto)
+
+        # Normalizar campos
+        datos["nombre_archivo_original"] = nombre_archivo
+        datos.setdefault("confianza_general", 80)
+        datos.setdefault("campos_baja_confianza", [])
+        datos.setdefault("items", [])
+
+        # Marcar campos con baja confianza automáticamente
+        _marcar_campos_baja_confianza(datos)
+
+        return {"ok": True, "datos": datos}
+
+    except json.JSONDecodeError as e:
+        return {
+            "ok": False,
+            "error": "La IA no pudo estructurar los datos del PDF",
+            "detalle": str(e)
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": "Error al procesar el PDF",
+            "detalle": str(e)
+        }
+
+def _marcar_campos_baja_confianza(datos: dict):
+    """Agrega campos obligatorios faltantes a la lista de baja confianza."""
+    campos_criticos = [
+        ("numero_factura", datos.get("numero_factura")),
+        ("proveedor.ruc", datos.get("proveedor", {}).get("ruc")),
+        ("proveedor.razon_social", datos.get("proveedor", {}).get("razon_social")),
+        ("fecha_emision", datos.get("fecha_emision")),
+        ("total", datos.get("total")),
+    ]
+
+    baja_confianza = set(datos.get("campos_baja_confianza", []))
+
+    for campo, valor in campos_criticos:
+        if not valor:
+            baja_confianza.add(campo)
+
+    # Si confianza general es baja, marcar todos los ítems
+    if datos.get("confianza_general", 100) < 70:
+        for item in datos.get("items", []):
+            item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
+
+    datos["campos_baja_confianza"] = list(baja_confianza)
+
+def hay_alertas(datos: dict) -> bool:
+    """Retorna True si hay campos que requieren revisión manual."""
+    return (
+        len(datos.get("campos_baja_confianza", [])) > 0
+        or datos.get("confianza_general", 100) < 75
+    )
