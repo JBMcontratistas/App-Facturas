@@ -73,6 +73,7 @@ async def get_me(usuario: Usuario = Depends(get_usuario_actual)):
 async def crear_usuario(
     data: UsuarioCreate,
     db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(require_admin)
 ):
     result = await db.execute(select(Usuario).where(Usuario.email == data.email))
     if result.scalar_one_or_none():
