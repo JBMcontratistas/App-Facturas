@@ -14,21 +14,19 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# CORS — permite que el frontend en Hostinger se comunique con este backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://jbmcg.com",
-    "https://www.jbmcg.com",
-    "http://localhost:3000",
-    "http://localhost:5173",
+        "https://www.jbmcg.com",
+        "http://localhost:3000",
+        "http://localhost:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Registrar todos los routers
 app.include_router(auth_router)
 app.include_router(facturas_router)
 app.include_router(proyectos_router)
