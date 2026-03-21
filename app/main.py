@@ -8,7 +8,7 @@ from app.routers.reportes import router as reportes_router
 
 app = FastAPI(
     title="JBM Compras API",
-    description="Sistema de gestión de facturas de compra — JBM Contratistas Generales S.A.C.",
+    description="Sistema de gestion de facturas de compra - JBM Contratistas Generales S.A.C.",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url=None,
