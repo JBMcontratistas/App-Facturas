@@ -65,7 +65,27 @@ async def extraer_factura(
     archivo: UploadFile = File(...),
     usuario=Depends(get_usuario_actual)
 ):
-    """
+    if not archivo.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
+
+    MAX_SIZE = 10 * 1024 * 1024
+    pdf_bytes = await archivo.read()
+    if len(pdf_bytes) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail="El archivo supera el límite de 10 MB")
+
+    resultado = await extraer_datos_pdf(pdf_bytes, archivo.filename)
+
+    if not resultado["ok"]:
+        raise HTTPException(status_code=422, detail=resultado["error"])
+
+    datos = resultado["datos"]
+    return {
+        "ok": True,
+        "datos": datos,
+        "tiene_alertas": hay_alertas(datos),
+        "nombre_archivo": archivo.filename,
+        "tamano_bytes": len(pdf_bytes),
+    }    """
     Paso 1: Recibe un PDF y lo procesa con IA.
     Retorna los datos extraídos para que el usuario los verifique.
     NO guarda nada en la base de datos todavía.
