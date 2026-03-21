@@ -63,7 +63,7 @@ class FacturaVerificada(BaseModel):
 @router.post("/extraer")
 async def extraer_factura(
     archivo: UploadFile = File(...),
-    usuario=Depends(require_admin_o_jefe)
+    usuario=Depends(get_usuario_actual)
 ):
     """
     Paso 1: Recibe un PDF y lo procesa con IA.
