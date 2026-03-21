@@ -1,12 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 from typing import Optional
 from datetime import date
-import re
 
 from app.database import get_db
 from app.models import Factura, FacturaItem, Proveedor, AsignacionProyecto, Proyecto
@@ -17,7 +15,6 @@ from app.config import settings
 
 router = APIRouter(prefix="/api/facturas", tags=["Facturas"])
 
-# ── Schemas ────────────────────────────────────────────────
 
 class ItemVerificado(BaseModel):
     linea: int
@@ -30,11 +27,13 @@ class ItemVerificado(BaseModel):
     subtotal: float
     categoria_id: Optional[int] = None
 
+
 class AsignacionInput(BaseModel):
     proyecto_id: int
     porcentaje: Optional[float] = None
     monto: Optional[float] = None
     nota: Optional[str] = None
+
 
 class FacturaVerificada(BaseModel):
     numero_factura: str
@@ -58,7 +57,6 @@ class FacturaVerificada(BaseModel):
     items: list[ItemVerificado]
     asignaciones: list[AsignacionInput]
 
-# ── Endpoints ─────────────────────────────────────────────
 
 @router.post("/extraer")
 async def extraer_factura(
@@ -71,32 +69,7 @@ async def extraer_factura(
     MAX_SIZE = 10 * 1024 * 1024
     pdf_bytes = await archivo.read()
     if len(pdf_bytes) > MAX_SIZE:
-        raise HTTPException(status_code=400, detail="El archivo supera el límite de 10 MB")
-
-    resultado = await extraer_datos_pdf(pdf_bytes, archivo.filename)
-
-    if not resultado["ok"]:
-        raise HTTPException(status_code=422, detail=resultado["error"])
-
-    datos = resultado["datos"]
-    return {
-        "ok": True,
-        "datos": datos,
-        "tiene_alertas": hay_alertas(datos),
-        "nombre_archivo": archivo.filename,
-        "tamano_bytes": len(pdf_bytes),
-    }    """
-    Paso 1: Recibe un PDF y lo procesa con IA.
-    Retorna los datos extraídos para que el usuario los verifique.
-    NO guarda nada en la base de datos todavía.
-    """
-    if not archivo.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
-
-    MAX_SIZE = 10 * 1024 * 1024  # 10 MB
-    pdf_bytes = await archivo.read()
-    if len(pdf_bytes) > MAX_SIZE:
-        raise HTTPException(status_code=400, detail="El archivo supera el límite de 10 MB")
+        raise HTTPException(status_code=400, detail="El archivo supera el limite de 10 MB")
 
     resultado = await extraer_datos_pdf(pdf_bytes, archivo.filename)
 
@@ -112,17 +85,13 @@ async def extraer_factura(
         "tamano_bytes": len(pdf_bytes),
     }
 
+
 @router.post("/guardar")
 async def guardar_factura(
     datos: FacturaVerificada,
     db: AsyncSession = Depends(get_db),
     usuario=Depends(require_admin_o_jefe)
 ):
-    """
-    Paso 2: Guarda la factura verificada en la base de datos.
-    El usuario ya confirmó o corrigió los datos extraídos por la IA.
-    """
-    # Verificar duplicado
     result = await db.execute(
         select(Factura).join(Proveedor).where(
             and_(
@@ -134,10 +103,9 @@ async def guardar_factura(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=409,
-            detail=f"La factura {datos.numero_factura} de este proveedor ya existe"
+            detail="La factura " + datos.numero_factura + " de este proveedor ya existe"
         )
 
-    # Upsert proveedor
     result = await db.execute(
         select(Proveedor).where(Proveedor.ruc == datos.proveedor_ruc)
     )
@@ -155,7 +123,6 @@ async def guardar_factura(
     else:
         proveedor.razon_social = datos.proveedor_razon_social
 
-    # Crear factura
     factura = Factura(
         numero_factura=datos.numero_factura,
         tipo_documento=datos.tipo_documento,
@@ -177,7 +144,6 @@ async def guardar_factura(
     db.add(factura)
     await db.flush()
 
-    # Crear ítems
     for item_data in datos.items:
         item = FacturaItem(
             factura_id=factura.id,
@@ -193,7 +159,6 @@ async def guardar_factura(
         )
         db.add(item)
 
-    # Crear asignaciones de proyecto
     for asig_data in datos.asignaciones:
         result = await db.execute(
             select(Proyecto).where(Proyecto.id == asig_data.proyecto_id)
@@ -201,7 +166,7 @@ async def guardar_factura(
         if not result.scalar_one_or_none():
             raise HTTPException(
                 status_code=404,
-                detail=f"Proyecto {asig_data.proyecto_id} no encontrado"
+                detail="Proyecto " + str(asig_data.proyecto_id) + " no encontrado"
             )
         asig = AsignacionProyecto(
             factura_id=factura.id,
@@ -215,6 +180,7 @@ async def guardar_factura(
     await db.commit()
     return {"ok": True, "factura_id": factura.id, "mensaje": "Factura guardada correctamente"}
 
+
 @router.post("/subir-pdf/{factura_id}")
 async def subir_pdf(
     factura_id: int,
@@ -222,9 +188,6 @@ async def subir_pdf(
     db: AsyncSession = Depends(get_db),
     usuario=Depends(require_admin_o_jefe)
 ):
-    """
-    Paso 3: Sube el PDF a OneDrive y vincula la URL a la factura.
-    """
     result = await db.execute(
         select(Factura).options(
             selectinload(Factura.asignaciones).selectinload(AsignacionProyecto.proyecto)
@@ -236,12 +199,10 @@ async def subir_pdf(
 
     pdf_bytes = await archivo.read()
 
-    # Usar el primer proyecto asignado para la carpeta, o "Sin proyecto"
     nombre_proyecto = "Sin proyecto"
     if factura.asignaciones:
         nombre_proyecto = factura.asignaciones[0].proyecto.nombre
 
-    # En desarrollo usar mock, en producción usar real
     fn = subir_pdf_onedrive_mock if settings.ENVIRONMENT == "development" else subir_pdf_onedrive
     resultado = await fn(pdf_bytes, archivo.filename, factura.fecha_emision, nombre_proyecto)
 
@@ -250,6 +211,7 @@ async def subir_pdf(
     await db.commit()
 
     return {"ok": True, "url": resultado.get("url"), "mock": settings.ENVIRONMENT == "development"}
+
 
 @router.get("/")
 async def listar_facturas(
@@ -263,7 +225,6 @@ async def listar_facturas(
     db: AsyncSession = Depends(get_db),
     usuario=Depends(require_cualquier_rol)
 ):
-    """Lista facturas con filtros y paginación."""
     query = (
         select(Factura)
         .options(selectinload(Factura.proveedor))
@@ -283,7 +244,6 @@ async def listar_facturas(
     if estado:
         query = query.where(Factura.estado_verificacion == estado)
 
-    # Total para paginación
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
 
@@ -299,6 +259,7 @@ async def listar_facturas(
         "por_pagina": por_pagina,
         "facturas": [_serializar_factura(f) for f in facturas]
     }
+
 
 @router.get("/{factura_id}")
 async def obtener_factura(
@@ -317,6 +278,7 @@ async def obtener_factura(
     if not factura:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
     return _serializar_factura(factura, detalle=True)
+
 
 def _serializar_factura(f: Factura, detalle: bool = False) -> dict:
     data = {
