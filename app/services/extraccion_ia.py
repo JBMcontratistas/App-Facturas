@@ -67,7 +67,7 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
 
     try:
         message = await client.messages.create(
-            model="claude-sonnet-4-5-20251001",
+            model="claude-sonnet-4-5",
             max_tokens=4096,
             messages=[
                 {
@@ -117,10 +117,12 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
             "detalle": str(e)
         }
     except Exception as e:
+        import traceback
         return {
             "ok": False,
             "error": "Error al procesar el PDF",
-            "detalle": str(e)
+            "detalle": str(e),
+            "traceback": traceback.format_exc()
         }
 
 def _marcar_campos_baja_confianza(datos: dict):
