@@ -74,7 +74,7 @@ async def extraer_factura(
     resultado = await extraer_datos_pdf(pdf_bytes, archivo.filename)
 
     if not resultado["ok"]:
-        raise HTTPException(status_code=422, detail=resultado["error"])
+        raise HTTPException(status_code=422, detail=resultado)
 
     datos = resultado["datos"]
     return {
