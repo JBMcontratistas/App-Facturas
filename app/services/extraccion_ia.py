@@ -1,10 +1,9 @@
 import anthropic
 import base64
 import json
-from pathlib import Path
 from app.config import settings
 
-client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 PROMPT_EXTRACCION = """Eres un asistente especializado en leer facturas electrónicas peruanas (SUNAT).
 Analiza el PDF adjunto y extrae TODOS los datos con máxima precisión.
@@ -67,8 +66,8 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
     pdf_base64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
 
     try:
-        message = client.messages.create(
-            model="claude-opus-4-5",
+        message = await client.messages.create(
+            model="claude-sonnet-4-5-20251001",
             max_tokens=4096,
             messages=[
                 {
