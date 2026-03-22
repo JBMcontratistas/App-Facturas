@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
 from app.routers.auth import router as auth_router
 from app.routers.facturas import router as facturas_router
 from app.routers.otros import proyectos_router, proveedores_router, catalogo_router
@@ -8,7 +7,6 @@ from app.routers.reportes import router as reportes_router
 
 app = FastAPI(
     title="JBM Compras API",
-    description="Sistema de gestion de facturas de compra - JBM Contratistas Generales S.A.C.",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url=None,
@@ -16,13 +14,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://jbmcg.com",
-        "https://www.jbmcg.com",
-        "http://localhost:3000",
-        "http://localhost:5173",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
