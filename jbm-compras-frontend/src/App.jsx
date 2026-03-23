@@ -5,9 +5,9 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Facturas from './pages/Facturas'
 import SubirFactura from './pages/SubirFactura'
+import Proyectos from './pages/Proyectos'
 
 // Páginas stub — se desarrollan en Fase 2 y 3
-const Proyectos  = () => <div className="card p-8 text-center text-gray-400">Proyectos — próximamente</div>
 const Catalogo   = () => <div className="card p-8 text-center text-gray-400">Catálogo de materiales — próximamente</div>
 const Reportes   = () => <div className="card p-8 text-center text-gray-400">Reportes — próximamente</div>
 const Usuarios   = () => <div className="card p-8 text-center text-gray-400">Gestión de usuarios — próximamente</div>
