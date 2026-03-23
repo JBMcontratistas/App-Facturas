@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-jbm-600 hover:bg-jbm-700 active:bg-jbm-800
+           text-white font-medium px-4 py-2.5 rounded-lg
+           transition-colors duration-150 disabled:opacity-50
+           disabled:cursor-not-allowed flex items-center gap-2
+           justify-center text-sm;
+  }
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 active:bg-gray-100
+           text-gray-700 font-medium px-4 py-2.5 rounded-lg
+           border border-gray-300 transition-colors duration-150
+           disabled:opacity-50 flex items-center gap-2
+           justify-center text-sm;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium
+           px-4 py-2.5 rounded-lg transition-colors duration-150
+           flex items-center gap-2 justify-center text-sm;
+  }
+  .input {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2.5
+           text-sm focus:outline-none focus:ring-2 focus:ring-jbm-500
+           focus:border-transparent transition-shadow bg-white
+           disabled:bg-gray-50 disabled:text-gray-500;
+  }
+  .input-alerta {
+    @apply input border-amber-400 bg-amber-50
+           focus:ring-amber-400;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+  .badge-verificada {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full
+           text-xs font-medium bg-green-100 text-green-800;
+  }
+  .badge-pendiente {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full
+           text-xs font-medium bg-amber-100 text-amber-800;
+  }
+  .badge-observacion {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full
+           text-xs font-medium bg-red-100 text-red-800;
+  }
+}
