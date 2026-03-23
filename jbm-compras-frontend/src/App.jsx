@@ -9,7 +9,7 @@ import Proyectos from './pages/Proyectos'
 
 // Páginas stub — se desarrollan en Fase 2 y 3
 const Catalogo   = () => <div className="card p-8 text-center text-gray-400">Catálogo de materiales — próximamente</div>
-const Reportes   = () => <div className="card p-8 text-center text-gray-400">Reportes — próximamente</div>
+import Reportes from './pages/Reportes'
 const Usuarios   = () => <div className="card p-8 text-center text-gray-400">Gestión de usuarios — próximamente</div>
 const DetalleFactura = () => <div className="card p-8 text-center text-gray-400">Detalle de factura — próximamente</div>
 
