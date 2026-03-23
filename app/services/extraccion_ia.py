@@ -1,7 +1,16 @@
 import anthropic
 import base64
 import json
+import io
+import re
 from app.config import settings
+
+# pdfplumber para extracción de texto sin IA
+try:
+    import pdfplumber
+    PDFPLUMBER_DISPONIBLE = True
+except ImportError:
+    PDFPLUMBER_DISPONIBLE = False
 
 client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
@@ -58,10 +67,109 @@ REGLAS IMPORTANTES:
 - campos_baja_confianza: lista de nombres de campos con confianza < 70
 """
 
-async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
+PROMPT_TEXTO_PLANO = """Eres un asistente especializado en leer facturas electrónicas peruanas (SUNAT).
+A continuación tienes el texto extraído de una factura PDF. Parsea los datos y responde ÚNICAMENTE con JSON válido.
+
+TEXTO DE LA FACTURA:
+{texto}
+
+Usa exactamente esta estructura (sin texto adicional, sin markdown):
+
+{
+  "confianza_general": 90,
+  "tipo_documento": "factura",
+  "proveedor": {
+    "ruc": "...",
+    "razon_social": "...",
+    "direccion": "...",
+    "telefono": "...",
+    "email": "..."
+  },
+  "numero_factura": "...",
+  "fecha_emision": "YYYY-MM-DD",
+  "fecha_vencimiento": "YYYY-MM-DD",
+  "moneda": "PEN",
+  "condicion_pago": "...",
+  "op_gravada": 0.00,
+  "op_inafecta": 0.00,
+  "op_exonerada": 0.00,
+  "igv": 0.00,
+  "total": 0.00,
+  "items": [],
+  "campos_baja_confianza": []
+}
+
+REGLAS: fechas YYYY-MM-DD, montos sin S/ ni comas, null si no existe el campo.
+"""
+
+
+def _extraer_texto_pdf(pdf_bytes: bytes) -> str | None:
     """
-    Extrae datos estructurados de una factura PDF usando Claude API.
-    Funciona para PDFs digitales y escaneados.
+    Intenta extraer texto de un PDF digital.
+    Retorna el texto si tiene contenido suficiente, None si es escaneado.
+    """
+    if not PDFPLUMBER_DISPONIBLE:
+        return None
+
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            texto_total = ""
+            for pagina in pdf.pages:
+                texto = pagina.extract_text()
+                if texto:
+                    texto_total += texto + "\n"
+
+        # Umbral: si hay menos de 100 caracteres, probablemente es escaneado
+        texto_limpio = texto_total.strip()
+        if len(texto_limpio) < 100:
+            return None
+
+        return texto_limpio
+
+    except Exception:
+        return None
+
+
+async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
+    """
+    Extrae datos usando Claude con texto plano (mucho más barato que enviar el PDF completo).
+    Usa claude-haiku que es más económico para texto estructurado simple.
+    """
+    prompt = PROMPT_TEXTO_PLANO.format(texto=texto[:8000])  # límite seguro
+
+    try:
+        message = await client.messages.create(
+            model="claude-haiku-4-5-20251001",  # más barato para texto
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        respuesta_texto = message.content[0].text.strip()
+
+        if respuesta_texto.startswith("```"):
+            lineas = respuesta_texto.split("\n")
+            respuesta_texto = "\n".join(lineas[1:-1])
+
+        datos = json.loads(respuesta_texto)
+        datos["nombre_archivo_original"] = nombre_archivo
+        datos["metodo_extraccion"] = "texto_plano"  # útil para logs/debug
+        datos.setdefault("confianza_general", 85)
+        datos.setdefault("campos_baja_confianza", [])
+        datos.setdefault("items", [])
+        _marcar_campos_baja_confianza(datos)
+
+        return {"ok": True, "datos": datos}
+
+    except json.JSONDecodeError as e:
+        return {"ok": False, "error": "Error parseando JSON del texto", "detalle": str(e)}
+    except Exception as e:
+        return {"ok": False, "error": "Error en extracción por texto", "detalle": str(e)}
+
+
+async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
+    """
+    Extrae datos enviando el PDF completo a Claude Sonnet (PDFs escaneados).
+    Más caro — solo usar cuando no hay texto extraíble.
     """
     pdf_base64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
 
@@ -81,10 +189,7 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
                                 "data": pdf_base64,
                             },
                         },
-                        {
-                            "type": "text",
-                            "text": PROMPT_EXTRACCION
-                        }
+                        {"type": "text", "text": PROMPT_EXTRACCION}
                     ],
                 }
             ],
@@ -92,30 +197,22 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
 
         respuesta_texto = message.content[0].text.strip()
 
-        # Limpiar markdown si la IA lo incluyó
         if respuesta_texto.startswith("```"):
             lineas = respuesta_texto.split("\n")
             respuesta_texto = "\n".join(lineas[1:-1])
 
         datos = json.loads(respuesta_texto)
-
-        # Normalizar campos
         datos["nombre_archivo_original"] = nombre_archivo
+        datos["metodo_extraccion"] = "vision_ia"  # útil para logs/debug
         datos.setdefault("confianza_general", 80)
         datos.setdefault("campos_baja_confianza", [])
         datos.setdefault("items", [])
-
-        # Marcar campos con baja confianza automáticamente
         _marcar_campos_baja_confianza(datos)
 
         return {"ok": True, "datos": datos}
 
     except json.JSONDecodeError as e:
-        return {
-            "ok": False,
-            "error": "La IA no pudo estructurar los datos del PDF",
-            "detalle": str(e)
-        }
+        return {"ok": False, "error": "La IA no pudo estructurar los datos del PDF", "detalle": str(e)}
     except Exception as e:
         import traceback
         return {
@@ -124,6 +221,29 @@ async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
             "detalle": str(e),
             "traceback": traceback.format_exc()
         }
+
+
+async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
+    """
+    Punto de entrada principal. Sistema híbrido:
+    1. Intenta extraer texto del PDF (gratis, pdfplumber)
+    2. Si hay texto suficiente → Claude Haiku con texto (barato)
+    3. Si es escaneado → Claude Sonnet con visión (caro, solo cuando necesario)
+    """
+    texto = _extraer_texto_pdf(pdf_bytes)
+
+    if texto:
+        # PDF digital: ruta barata
+        resultado = await _extraer_con_texto(texto, nombre_archivo)
+        # Si falla el parseo de texto, fallback a visión
+        if not resultado["ok"]:
+            resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
+    else:
+        # PDF escaneado: ruta con visión
+        resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
+
+    return resultado
+
 
 def _marcar_campos_baja_confianza(datos: dict):
     """Agrega campos obligatorios faltantes a la lista de baja confianza."""
@@ -141,12 +261,12 @@ def _marcar_campos_baja_confianza(datos: dict):
         if not valor:
             baja_confianza.add(campo)
 
-    # Si confianza general es baja, marcar todos los ítems
     if datos.get("confianza_general", 100) < 70:
         for item in datos.get("items", []):
             item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
 
     datos["campos_baja_confianza"] = list(baja_confianza)
+
 
 def hay_alertas(datos: dict) -> bool:
     """Retorna True si hay campos que requieren revisión manual."""
@@ -154,3 +274,12 @@ def hay_alertas(datos: dict) -> bool:
         len(datos.get("campos_baja_confianza", [])) > 0
         or datos.get("confianza_general", 100) < 75
     )
+```
+
+---
+
+**Para activarlo necesitas instalar pdfplumber en Railway:**
+
+Agrega esto a tu `requirements.txt`:
+```
+pdfplumber>=0.10.0
