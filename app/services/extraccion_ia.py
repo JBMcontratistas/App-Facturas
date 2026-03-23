@@ -103,7 +103,7 @@ REGLAS: fechas YYYY-MM-DD, montos sin S/ ni comas, null si no existe el campo.
 """
 
 
-def _extraer_texto_pdf(pdf_bytes: bytes) -> str | None:
+def _extraer_texto_pdf(pdf_bytes: bytes):
     """
     Intenta extraer texto de un PDF digital.
     Retorna el texto si tiene contenido suficiente, None si es escaneado.
