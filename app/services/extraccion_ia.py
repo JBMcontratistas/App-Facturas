@@ -12,10 +12,10 @@ except ImportError:
 
 client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-PROMPT_EXTRACCION = """Eres un asistente especializado en leer facturas electrónicas peruanas (SUNAT).
-Analiza el PDF adjunto y extrae TODOS los datos con máxima precisión.
+PROMPT_EXTRACCION = """Eres un asistente especializado en leer facturas electronicas peruanas (SUNAT).
+Analiza el PDF adjunto y extrae TODOS los datos con maxima precision.
 
-Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto adicional, sin markdown):
+Responde UNICAMENTE con un JSON valido con esta estructura exacta (sin texto adicional, sin markdown):
 
 {
   "confianza_general": 95,
@@ -56,17 +56,17 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto a
 REGLAS IMPORTANTES:
 - tipo_documento: "factura", "recibo_honorarios", "boleta" u "otro"
 - fechas en formato YYYY-MM-DD
-- montos como números decimales (sin símbolo S/ ni comas de miles)
+- montos como numeros decimales (sin simbolo S/ ni comas de miles)
 - Si un campo no existe en el documento, usar null
 - precio_unit_con_igv = precio que aparece en columna P.UNIT de la factura
 - precio_unit_sin_igv = precio en columna SIN IGV (si existe), si no: calcular dividiendo entre 1.18
-- confianza_general: 0-100 según qué tan legible y completo está el documento
-- confianza_campo por ítem: 0-100 según legibilidad de esa línea específica
-- campos_baja_confianza: lista de nombres de campos con confianza < 70
+- confianza_general: 0-100 segun que tan legible y completo esta el documento
+- confianza_campo por item: 0-100 segun legibilidad de esa linea especifica
+- campos_baja_confianza: lista de nombres de campos con confianza menor a 70
 """
 
-PROMPT_TEXTO_PLANO = """Eres un asistente especializado en leer facturas electrónicas peruanas (SUNAT).
-A continuación tienes el texto extraído de una factura PDF. Parsea los datos y responde ÚNICAMENTE con JSON válido.
+PROMPT_TEXTO_PLANO = """Eres un asistente especializado en leer facturas electronicas peruanas (SUNAT).
+A continuacion tienes el texto extraido de una factura PDF. Parsea los datos y responde UNICAMENTE con JSON valido.
 
 TEXTO DE LA FACTURA:
 {texto}
@@ -142,7 +142,7 @@ async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
     except json.JSONDecodeError as e:
         return {"ok": False, "error": "Error parseando JSON del texto", "detalle": str(e)}
     except Exception as e:
-        return {"ok": False, "error": "Error en extracción por texto", "detalle": str(e)}
+        return {"ok": False, "error": "Error en extraccion por texto", "detalle": str(e)}
 
 
 async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
@@ -217,12 +217,4 @@ def _marcar_campos_baja_confianza(datos: dict):
             baja_confianza.add(campo)
     if datos.get("confianza_general", 100) < 70:
         for item in datos.get("items", []):
-            item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
-    datos["campos_baja_confianza"] = list(baja_confianza)
-
-
-def hay_alertas(datos: dict) -> bool:
-    return (
-        len(datos.get("campos_baja_confianza", [])) > 0
-        or datos.get("confianza_general", 100) < 75
-    )
+            item["confi
