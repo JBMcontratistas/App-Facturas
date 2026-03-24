@@ -217,4 +217,12 @@ def _marcar_campos_baja_confianza(datos: dict):
             baja_confianza.add(campo)
     if datos.get("confianza_general", 100) < 70:
         for item in datos.get("items", []):
-            item["confi
+            item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
+    datos["campos_baja_confianza"] = list(baja_confianza)
+
+
+def hay_alertas(datos: dict) -> bool:
+    return (
+        len(datos.get("campos_baja_confianza", [])) > 0
+        or datos.get("confianza_general", 100) < 75
+    )
