@@ -2,11 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.auth import router as auth_router
 from app.routers.facturas import router as facturas_router
-from app.routers.otros import proyectos_router, proveedores_router, catalogo_router
+from app.routers.otros import proyectos_router, proveedores_router
 from app.routers.reportes import router as reportes_router
 from app.routers.catalogo import router as catalogo_router
-# ...junto a los otros includes:
-app.include_router(catalogo_router)
 
 app = FastAPI(
     title="JBM Compras API",
