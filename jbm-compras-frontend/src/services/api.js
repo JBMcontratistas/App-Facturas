@@ -1,17 +1,13 @@
 import axios from 'axios'
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 const api = axios.create({ baseURL: API_URL })
 
-// Adjuntar token JWT automáticamente en cada request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('jbm_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Si el token venció, redirigir al login
 api.interceptors.response.use(
   res => res,
   err => {
@@ -70,6 +66,7 @@ export const proveedoresService = {
 // ── CATÁLOGO ────────────────────────────────────────────
 export const catalogoService = {
   categorias: () => api.get('/api/catalogo/categorias'),
+  crearCategoria: (data) => api.post('/api/catalogo/categorias', data),
   materiales: (params) => api.get('/api/catalogo/materiales', { params }),
   crearMaterial: (data) => api.post('/api/catalogo/materiales', data),
   historialPrecios: (id) => api.get(`/api/catalogo/materiales/${id}/historial`),
