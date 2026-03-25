@@ -21,7 +21,6 @@ export default function SubirFactura() {
     catalogoService.categorias().then(r => setCategorias(r.data))
   }, [])
 
-  // ── Paso 1: Dropzone ──────────────────────────────────
   const onDrop = useCallback(files => {
     if (files[0]) setArchivo(files[0])
   }, [])
@@ -49,7 +48,6 @@ export default function SubirFactura() {
     }
   }
 
-  // ── Paso 3: Asignaciones ──────────────────────────────
   const agregarAsignacion = () => {
     setAsignaciones(a => [...a, { proyecto_id: '', porcentaje: '', monto: '', nota: '' }])
   }
@@ -62,7 +60,13 @@ export default function SubirFactura() {
     setAsignaciones(a => a.filter((_, idx) => idx !== i))
   }
 
-  // ── Paso 4: Guardar ───────────────────────────────────
+  const eliminarItem = (i) => {
+    setDatosExtraidos(prev => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== i)
+    }))
+  }
+
   const guardar = async () => {
     setCargando(true)
     setError('')
@@ -84,16 +88,18 @@ export default function SubirFactura() {
         condicion_pago: datosExtraidos.condicion_pago,
         nota: datosExtraidos.nota_libre || '',
         confianza_ia: datosExtraidos.confianza_general,
-        items: (datosExtraidos.items || []).map((item, i) => ({
-          linea: item.linea || i + 1,
-          descripcion: item.descripcion,
-          unidad: item.unidad,
-          cantidad: item.cantidad,
-          precio_unit_con_igv: item.precio_unit_con_igv,
-          precio_unit_sin_igv: item.precio_unit_sin_igv,
-          subtotal: item.subtotal,
-          categoria_id: item.categoria_id || null,
-        })),
+        items: (datosExtraidos.items || [])
+          .filter(item => item.descripcion && item.descripcion.trim() !== '')
+          .map((item, i) => ({
+            linea: item.linea || i + 1,
+            descripcion: item.descripcion,
+            unidad: item.unidad,
+            cantidad: item.cantidad,
+            precio_unit_con_igv: item.precio_unit_con_igv,
+            precio_unit_sin_igv: item.precio_unit_sin_igv,
+            subtotal: item.subtotal,
+            categoria_id: item.categoria_id || null,
+          })),
         asignaciones: asignaciones
           .filter(a => a.proyecto_id)
           .map(a => ({
@@ -106,10 +112,7 @@ export default function SubirFactura() {
 
       const res = await facturasService.guardar(payload)
       const facturaId = res.data.factura_id
-
-      // Subir PDF a OneDrive
       await facturasService.subirPdf(facturaId, archivo)
-
       setGuardado({ facturaId })
       setPaso(4)
     } catch (err) {
@@ -129,7 +132,6 @@ export default function SubirFactura() {
     setError('')
   }
 
-  // ── Helpers UI ────────────────────────────────────────
   const campoConAlerta = (campo) =>
     datosExtraidos?.campos_baja_confianza?.includes(campo)
 
@@ -154,19 +156,13 @@ export default function SubirFactura() {
     }))
   }
 
-  // ══════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════
   return (
     <div className="max-w-3xl mx-auto">
-
-      {/* Título */}
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">Subir factura</h2>
         <p className="text-sm text-gray-500 mt-1">Carga un PDF y el sistema extrae los datos automáticamente</p>
       </div>
 
-      {/* Indicador de pasos */}
       {paso < 4 && (
         <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1">
           {PASOS.map((label, i) => (
@@ -191,7 +187,7 @@ export default function SubirFactura() {
         </div>
       )}
 
-      {/* ── PASO 0: SUBIR ───────────────────────────── */}
+      {/* PASO 0: SUBIR */}
       {paso === 0 && (
         <div className="card p-6">
           <div
@@ -217,13 +213,8 @@ export default function SubirFactura() {
               </div>
             )}
           </div>
-
           {archivo && (
-            <button
-              onClick={procesarPdf}
-              disabled={cargando}
-              className="btn-primary w-full mt-4 py-3"
-            >
+            <button onClick={procesarPdf} disabled={cargando} className="btn-primary w-full mt-4 py-3">
               {cargando ? (
                 <>
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -238,7 +229,7 @@ export default function SubirFactura() {
         </div>
       )}
 
-      {/* ── PASO 1: VERIFICAR ───────────────────────── */}
+      {/* PASO 1: VERIFICAR */}
       {paso === 1 && datosExtraidos && (
         <div className="space-y-4">
           {tieneAlertas && (
@@ -248,7 +239,6 @@ export default function SubirFactura() {
             </div>
           )}
 
-          {/* Cabecera factura */}
           <div className="card p-4">
             <h3 className="font-semibold text-gray-800 mb-4">Datos del proveedor y factura</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -313,7 +303,6 @@ export default function SubirFactura() {
             </div>
           </div>
 
-          {/* Ítems */}
           <div className="card p-4">
             <h3 className="font-semibold text-gray-800 mb-4">
               Ítems ({datosExtraidos.items?.length || 0})
@@ -323,9 +312,19 @@ export default function SubirFactura() {
                 <div key={i} className={`rounded-lg border p-3 ${
                   item.confianza_campo < 70 ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
                 }`}>
-                  {item.confianza_campo < 70 && (
-                    <p className="text-xs text-amber-700 mb-2 font-medium">⚠️ Revisar este ítem</p>
-                  )}
+                  <div className="flex justify-between items-center mb-2">
+                    {item.confianza_campo < 70 ? (
+                      <p className="text-xs text-amber-700 font-medium">⚠️ Revisar este ítem</p>
+                    ) : (
+                      <span />
+                    )}
+                    <button
+                      onClick={() => eliminarItem(i)}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium ml-auto"
+                    >
+                      ✕ Eliminar ítem
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="sm:col-span-2">
                       <label className="label">Descripción</label>
@@ -382,14 +381,13 @@ export default function SubirFactura() {
         </div>
       )}
 
-      {/* ── PASO 2: ASIGNAR PROYECTO ─────────────────── */}
+      {/* PASO 2: ASIGNAR PROYECTO */}
       {paso === 2 && (
         <div className="card p-4 space-y-4">
           <h3 className="font-semibold text-gray-800">Asignar a proyecto</h3>
           <p className="text-sm text-gray-500">
             Puedes dividir la factura entre varios proyectos usando porcentaje o monto fijo.
           </p>
-
           {asignaciones.map((asig, i) => (
             <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-3">
               <div className="flex justify-between items-center">
@@ -433,11 +431,9 @@ export default function SubirFactura() {
               </div>
             </div>
           ))}
-
           <button onClick={agregarAsignacion} className="btn-secondary w-full">
             + Agregar otro proyecto
           </button>
-
           <div className="flex gap-3">
             <button onClick={() => setPaso(1)} className="btn-secondary flex-1">← Volver</button>
             <button onClick={() => setPaso(3)} className="btn-primary flex-1">Continuar →</button>
@@ -445,7 +441,7 @@ export default function SubirFactura() {
         </div>
       )}
 
-      {/* ── PASO 3: CONFIRMAR ───────────────────────── */}
+      {/* PASO 3: CONFIRMAR */}
       {paso === 3 && datosExtraidos && (
         <div className="space-y-4">
           <div className="card p-4">
@@ -477,7 +473,6 @@ export default function SubirFactura() {
               </div>
             </div>
           </div>
-
           <div className="card p-4">
             <h4 className="text-sm font-semibold text-gray-700 mb-2">Proyectos asignados</h4>
             {asignaciones.filter(a => a.proyecto_id).map((a, i) => {
@@ -495,13 +490,11 @@ export default function SubirFactura() {
               <p className="text-sm text-gray-400 italic">Sin proyecto asignado</p>
             )}
           </div>
-
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
               ⚠️ {error}
             </div>
           )}
-
           <div className="flex gap-3">
             <button onClick={() => setPaso(2)} className="btn-secondary flex-1">← Volver</button>
             <button onClick={guardar} disabled={cargando} className="btn-primary flex-1 py-3">
@@ -519,7 +512,7 @@ export default function SubirFactura() {
         </div>
       )}
 
-      {/* ── PASO 4: ÉXITO ───────────────────────────── */}
+      {/* PASO 4: ÉXITO */}
       {paso === 4 && (
         <div className="card p-8 text-center">
           <div className="text-5xl mb-4">✅</div>
