@@ -3,13 +3,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const NAV = [
-  { href: '/',            icono: '📊', label: 'Dashboard',   roles: ['administrador','jefe_proyecto','gerencia'] },
-  { href: '/facturas',    icono: '🧾', label: 'Facturas',    roles: ['administrador','jefe_proyecto','gerencia'] },
-  { href: '/subir',       icono: '⬆️',  label: 'Subir factura', roles: ['administrador','jefe_proyecto'] },
-  { href: '/proyectos',   icono: '🏗️',  label: 'Proyectos',  roles: ['administrador','gerencia'] },
-  { href: '/catalogo',    icono: '📦', label: 'Catálogo',    roles: ['administrador','jefe_proyecto','gerencia'] },
-  { href: '/reportes',    icono: '📈', label: 'Reportes',    roles: ['administrador','gerencia'] },
-  { href: '/usuarios',    icono: '👥', label: 'Usuarios',    roles: ['administrador'] },
+  { href: '/',          icono: '📊', label: 'Dashboard',      roles: ['administrador','jefe_proyecto','gerencia','contador','asistente','invitado'] },
+  { href: '/facturas',  icono: '🧾', label: 'Facturas',       roles: ['administrador','jefe_proyecto','gerencia','contador','asistente','invitado'] },
+  { href: '/subir',     icono: '⬆️',  label: 'Subir factura',  roles: ['administrador','jefe_proyecto','asistente'] },
+  { href: '/proyectos', icono: '🏗️',  label: 'Proyectos',     roles: ['administrador','gerencia','jefe_proyecto'] },
+  { href: '/catalogo',  icono: '📦', label: 'Catálogo',       roles: ['administrador','jefe_proyecto','gerencia','contador','asistente'] },
+  { href: '/reportes',  icono: '📈', label: 'Reportes',       roles: ['administrador','gerencia','contador','jefe_proyecto','asistente','invitado'] },
+  { href: '/usuarios',  icono: '👥', label: 'Usuarios',       roles: ['administrador'] },
 ]
 
 export default function Layout({ children }) {
