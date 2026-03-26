@@ -78,7 +78,7 @@ export default function Usuarios() {
           <h2 className="text-xl font-bold text-gray-900">Gestión de usuarios</h2>
           <p className="text-sm text-gray-500 mt-0.5">Solo administradores pueden gestionar usuarios</p>
         </div>
-        {usuarioActual?.rol === 'admin' && (
+        {(usuarioActual?.rol === 'admin' || usuarioActual?.rol === 'administrador') && (
           <button
             onClick={() => setModalNuevo(true)}
             className="bg-jbm-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-jbm-700 transition-colors"
