@@ -6,6 +6,7 @@ const ROLES = [
   { value: 'admin', label: 'Administrador' },
   { value: 'jefe_proyecto', label: 'Jefe de proyecto' },
   { value: 'contador', label: 'Contador' },
+  { value: 'asistente', label: 'Asistente' },
 ]
 
 export default function Usuarios() {
