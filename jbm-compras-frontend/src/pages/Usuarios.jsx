@@ -3,10 +3,12 @@ import { authService } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 
 const ROLES = [
-  { value: 'admin', label: 'Administrador' },
+  { value: 'administrador', label: 'Administrador' },
   { value: 'jefe_proyecto', label: 'Jefe de proyecto' },
+  { value: 'gerencia', label: 'Gerencia' },
   { value: 'contador', label: 'Contador' },
   { value: 'asistente', label: 'Asistente' },
+  { value: 'invitado', label: 'Invitado' },
 ]
 
 export default function Usuarios() {
