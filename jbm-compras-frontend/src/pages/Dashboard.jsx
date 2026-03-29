@@ -19,7 +19,6 @@ export default function Dashboard() {
       reportesService.gastosPorMes(anio),
     ]).then(([r1, r2]) => {
       setResumen(r1.data)
-      // Asegurar 12 meses en el gráfico
       const datos = Array.from({ length: 12 }, (_, i) => {
         const encontrado = r2.data.find(m => m.mes === i + 1)
         return {
@@ -29,7 +28,7 @@ export default function Dashboard() {
         }
       })
       setGastosMes(datos)
-      }).catch(() => null).finally(() => setCargando(false))    }).finally(() => setCargando(false))
+    }).catch(() => null).finally(() => setCargando(false))
   }, [])
 
   const fmt = (n) => n ? `S/ ${parseFloat(n).toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : 'S/ 0.00'
@@ -44,7 +43,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Saludo */}
       <div>
         <h2 className="text-xl font-bold text-gray-900">
           Hola, {usuario?.nombre?.split(' ')[0]} 👋
@@ -54,7 +52,6 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Tarjetas de resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="card p-4">
           <p className="text-xs text-gray-500 mb-1">Gasto este mes</p>
@@ -84,7 +81,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Gráfico gastos por mes */}
       <div className="card p-4">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-semibold text-gray-800">Gastos por mes — {anio}</h3>
@@ -104,7 +100,6 @@ export default function Dashboard() {
         </ResponsiveContainer>
       </div>
 
-      {/* Accesos rápidos */}
       <div>
         <h3 className="font-semibold text-gray-700 mb-3 text-sm">Accesos rápidos</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
