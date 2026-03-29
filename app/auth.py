@@ -61,4 +61,4 @@ def require_rol(*roles):
 # Shortcuts de roles
 require_admin        = require_rol("administrador")
 require_admin_o_jefe = require_rol("administrador", "jefe_proyecto")
-require_cualquier_rol = require_rol("administrador", "jefe_proyecto", "gerencia")
+require_cualquier_rol = require_rol("administrador", "jefe_proyecto", "gerencia", "contador", "asistente", "invitado")
