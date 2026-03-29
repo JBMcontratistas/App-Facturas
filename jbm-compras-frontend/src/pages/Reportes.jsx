@@ -51,7 +51,7 @@ export default function Reportes() {
         })
         setGastosMes(datos)
       })
-      .catch(() => setError('Error cargando gastos por mes'))
+      .catch(() => null)
       .finally(() => setCargando(false))
   }, [anioSel])
 
