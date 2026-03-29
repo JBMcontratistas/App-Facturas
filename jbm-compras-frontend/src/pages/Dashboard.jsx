@@ -29,8 +29,7 @@ export default function Dashboard() {
         }
       })
       setGastosMes(datos)
-      }).catch(() => null).finally(() => setCargando(false))
-    }).finally(() => setCargando(false))
+      }).catch(() => null).finally(() => setCargando(false))    }).finally(() => setCargando(false))
   }, [])
 
   const fmt = (n) => n ? `S/ ${parseFloat(n).toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : 'S/ 0.00'
