@@ -29,6 +29,7 @@ export default function Dashboard() {
         }
       })
       setGastosMes(datos)
+      }).catch(() => null).finally(() => setCargando(false))
     }).finally(() => setCargando(false))
   }, [])
 
