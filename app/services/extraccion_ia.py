@@ -18,16 +18,16 @@ Analiza el PDF adjunto y extrae TODOS los datos con maxima precision.
 
 Responde UNICAMENTE con un JSON valido con esta estructura exacta (sin texto adicional, sin markdown):
 
-{
+{{
   "confianza_general": 95,
   "tipo_documento": "factura",
-  "proveedor": {
+  "proveedor": {{
     "ruc": "20613675281",
     "razon_social": "GRUPO RIALVA S.A.C.",
     "direccion": "...",
     "telefono": "...",
     "email": "..."
-  },
+  }},
   "numero_factura": "F001-00002894",
   "fecha_emision": "2026-03-03",
   "fecha_vencimiento": "2026-03-03",
@@ -39,7 +39,7 @@ Responde UNICAMENTE con un JSON valido con esta estructura exacta (sin texto adi
   "igv": 481.88,
   "total": 3159.00,
   "items": [
-    {
+    {{
       "linea": 1,
       "codigo_producto": "",
       "descripcion": "KG. DE. CAUCHO. GRANULADO",
@@ -49,10 +49,10 @@ Responde UNICAMENTE con un JSON valido con esta estructura exacta (sin texto adi
       "precio_unit_sin_igv": 1.57,
       "subtotal": 3159.00,
       "confianza_campo": 98
-    }
+    }}
   ],
   "campos_baja_confianza": []
-}
+}}
 
 REGLAS IMPORTANTES:
 - tipo_documento: "factura", "recibo_honorarios", "boleta" u "otro"
@@ -74,16 +74,16 @@ TEXTO DE LA FACTURA:
 
 Usa exactamente esta estructura (sin texto adicional, sin markdown):
 
-{
+{{
   "confianza_general": 90,
   "tipo_documento": "factura",
-  "proveedor": {
+  "proveedor": {{
     "ruc": "...",
     "razon_social": "...",
     "direccion": "...",
     "telefono": "...",
     "email": "..."
-  },
+  }},
   "numero_factura": "...",
   "fecha_emision": "YYYY-MM-DD",
   "fecha_vencimiento": "YYYY-MM-DD",
@@ -96,7 +96,7 @@ Usa exactamente esta estructura (sin texto adicional, sin markdown):
   "total": 0.00,
   "items": [],
   "campos_baja_confianza": []
-}
+}}
 
 REGLAS: fechas YYYY-MM-DD, montos sin S/ ni comas, null si no existe el campo.
 """
@@ -143,7 +143,6 @@ async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
         respuesta_raw = message.content[0].text
         logging.warning(f"HAIKU_RAW: {repr(respuesta_raw[:300])}")
         respuesta_texto = _limpiar_json(respuesta_raw)
-        logging.warning(f"HAIKU_LIMPIO: {repr(respuesta_texto[:300])}")
         datos = json.loads(respuesta_texto)
         datos["nombre_archivo_original"] = nombre_archivo
         datos["metodo_extraccion"] = "texto_plano"
@@ -195,4 +194,48 @@ async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
         _marcar_campos_baja_confianza(datos)
         return {"ok": True, "datos": datos}
     except json.JSONDecodeError as e:
-        return {"ok": False, "error": "La IA no pudo estruc
+        return {"ok": False, "error": "La IA no pudo estructurar los datos del PDF", "detalle": str(e)}
+    except Exception as e:
+        import traceback
+        return {
+            "ok": False,
+            "error": "Error al procesar el PDF",
+            "detalle": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
+    texto = _extraer_texto_pdf(pdf_bytes)
+    if texto:
+        resultado = await _extraer_con_texto(texto, nombre_archivo)
+        if not resultado["ok"]:
+            resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
+    else:
+        resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
+    return resultado
+
+
+def _marcar_campos_baja_confianza(datos: dict):
+    campos_criticos = [
+        ("numero_factura", datos.get("numero_factura")),
+        ("proveedor.ruc", datos.get("proveedor", {}).get("ruc")),
+        ("proveedor.razon_social", datos.get("proveedor", {}).get("razon_social")),
+        ("fecha_emision", datos.get("fecha_emision")),
+        ("total", datos.get("total")),
+    ]
+    baja_confianza = set(datos.get("campos_baja_confianza", []))
+    for campo, valor in campos_criticos:
+        if not valor:
+            baja_confianza.add(campo)
+    if datos.get("confianza_general", 100) < 70:
+        for item in datos.get("items", []):
+            item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
+    datos["campos_baja_confianza"] = list(baja_confianza)
+
+
+def hay_alertas(datos: dict) -> bool:
+    return (
+        len(datos.get("campos_baja_confianza", [])) > 0
+        or datos.get("confianza_general", 100) < 75
+    )
