@@ -72,6 +72,12 @@ A continuacion tienes el texto extraido de una factura PDF. Parsea los datos y r
 TEXTO DE LA FACTURA:
 {texto}
 
+IMPORTANTE para los items:
+- "precio_unit_con_igv" = columna "Precio Unit." o "P.UNIT" (precio con IGV incluido)
+- "precio_unit_sin_igv" = columna "Valor Unit." o "V.UNIT" o "SIN IGV" (precio sin IGV)
+- Si solo existe un precio unitario, calcular: sin_igv = precio / 1.18
+- "subtotal" = columna "Valor Total" o "TOTAL" por linea
+
 Usa exactamente esta estructura (sin texto adicional, sin markdown):
 
 {{
@@ -94,13 +100,24 @@ Usa exactamente esta estructura (sin texto adicional, sin markdown):
   "op_exonerada": 0.00,
   "igv": 0.00,
   "total": 0.00,
-  "items": [],
+  "items": [
+    {{
+      "linea": 1,
+      "codigo_producto": "...",
+      "descripcion": "...",
+      "unidad": "...",
+      "cantidad": 0,
+      "precio_unit_con_igv": 0.00,
+      "precio_unit_sin_igv": 0.00,
+      "subtotal": 0.00,
+      "confianza_campo": 90
+    }}
+  ],
   "campos_baja_confianza": []
 }}
 
 REGLAS: fechas YYYY-MM-DD, montos sin S/ ni comas, null si no existe el campo.
 """
-
 
 def _extraer_texto_pdf(pdf_bytes: bytes):
     if not PDFPLUMBER_DISPONIBLE:
