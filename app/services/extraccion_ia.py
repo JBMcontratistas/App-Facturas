@@ -2,6 +2,7 @@ import anthropic
 import base64
 import json
 import io
+import logging
 from app.config import settings
 
 try:
@@ -121,16 +122,15 @@ def _extraer_texto_pdf(pdf_bytes: bytes):
 
 def _limpiar_json(respuesta_texto: str) -> str:
     respuesta_texto = respuesta_texto.strip()
-    # Limpiar markdown
     if respuesta_texto.startswith("```"):
         lineas = respuesta_texto.split("\n")
         respuesta_texto = "\n".join(lineas[1:-1])
-    # Extraer solo el bloque JSON
     inicio = respuesta_texto.find("{")
     fin = respuesta_texto.rfind("}") + 1
     if inicio >= 0 and fin > inicio:
         respuesta_texto = respuesta_texto[inicio:fin]
     return respuesta_texto
+
 
 async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
     prompt = PROMPT_TEXTO_PLANO.format(texto=texto[:8000])
@@ -140,7 +140,10 @@ async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}]
         )
-        respuesta_texto = _limpiar_json(message.content[0].text)
+        respuesta_raw = message.content[0].text
+        logging.warning(f"HAIKU_RAW: {repr(respuesta_raw[:300])}")
+        respuesta_texto = _limpiar_json(respuesta_raw)
+        logging.warning(f"HAIKU_LIMPIO: {repr(respuesta_texto[:300])}")
         datos = json.loads(respuesta_texto)
         datos["nombre_archivo_original"] = nombre_archivo
         datos["metodo_extraccion"] = "texto_plano"
@@ -150,8 +153,10 @@ async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
         _marcar_campos_baja_confianza(datos)
         return {"ok": True, "datos": datos}
     except json.JSONDecodeError as e:
+        logging.warning(f"HAIKU_JSON_ERROR: {str(e)}")
         return {"ok": False, "error": "Error parseando JSON del texto", "detalle": str(e)}
     except Exception as e:
+        logging.warning(f"HAIKU_EXCEPTION: {str(e)}")
         return {"ok": False, "error": "Error en extraccion por texto", "detalle": str(e)}
 
 
@@ -178,7 +183,9 @@ async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
                 }
             ],
         )
-        respuesta_texto = _limpiar_json(message.content[0].text)
+        respuesta_raw = message.content[0].text
+        logging.warning(f"SONNET_RAW: {repr(respuesta_raw[:300])}")
+        respuesta_texto = _limpiar_json(respuesta_raw)
         datos = json.loads(respuesta_texto)
         datos["nombre_archivo_original"] = nombre_archivo
         datos["metodo_extraccion"] = "vision_ia"
@@ -188,48 +195,4 @@ async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
         _marcar_campos_baja_confianza(datos)
         return {"ok": True, "datos": datos}
     except json.JSONDecodeError as e:
-        return {"ok": False, "error": "La IA no pudo estructurar los datos del PDF", "detalle": str(e)}
-    except Exception as e:
-        import traceback
-        return {
-            "ok": False,
-            "error": "Error al procesar el PDF",
-            "detalle": str(e),
-            "traceback": traceback.format_exc()
-        }
-
-
-async def extraer_datos_pdf(pdf_bytes: bytes, nombre_archivo: str) -> dict:
-    texto = _extraer_texto_pdf(pdf_bytes)
-    if texto:
-        resultado = await _extraer_con_texto(texto, nombre_archivo)
-        if not resultado["ok"]:
-            resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
-    else:
-        resultado = await _extraer_con_vision(pdf_bytes, nombre_archivo)
-    return resultado
-
-
-def _marcar_campos_baja_confianza(datos: dict):
-    campos_criticos = [
-        ("numero_factura", datos.get("numero_factura")),
-        ("proveedor.ruc", datos.get("proveedor", {}).get("ruc")),
-        ("proveedor.razon_social", datos.get("proveedor", {}).get("razon_social")),
-        ("fecha_emision", datos.get("fecha_emision")),
-        ("total", datos.get("total")),
-    ]
-    baja_confianza = set(datos.get("campos_baja_confianza", []))
-    for campo, valor in campos_criticos:
-        if not valor:
-            baja_confianza.add(campo)
-    if datos.get("confianza_general", 100) < 70:
-        for item in datos.get("items", []):
-            item["confianza_campo"] = min(item.get("confianza_campo", 50), 60)
-    datos["campos_baja_confianza"] = list(baja_confianza)
-
-
-def hay_alertas(datos: dict) -> bool:
-    return (
-        len(datos.get("campos_baja_confianza", [])) > 0
-        or datos.get("confianza_general", 100) < 75
-    )
+        return {"ok": False, "error": "La IA no pudo estruc
