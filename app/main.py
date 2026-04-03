@@ -5,6 +5,8 @@ from app.routers.facturas import router as facturas_router
 from app.routers.otros import proyectos_router, proveedores_router
 from app.routers.reportes import router as reportes_router
 from app.routers.catalogo import router as catalogo_router
+from app.routers import estimaciones
+app.include_router(estimaciones.router)
 
 app = FastAPI(
     title="JBM Compras API",
