@@ -121,15 +121,16 @@ def _extraer_texto_pdf(pdf_bytes: bytes):
 
 def _limpiar_json(respuesta_texto: str) -> str:
     respuesta_texto = respuesta_texto.strip()
+    # Limpiar markdown
     if respuesta_texto.startswith("```"):
         lineas = respuesta_texto.split("\n")
         respuesta_texto = "\n".join(lineas[1:-1])
+    # Extraer solo el bloque JSON
     inicio = respuesta_texto.find("{")
     fin = respuesta_texto.rfind("}") + 1
     if inicio >= 0 and fin > inicio:
         respuesta_texto = respuesta_texto[inicio:fin]
     return respuesta_texto
-
 
 async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
     prompt = PROMPT_TEXTO_PLANO.format(texto=texto[:8000])
