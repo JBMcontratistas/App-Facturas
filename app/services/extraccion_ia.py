@@ -119,6 +119,18 @@ def _extraer_texto_pdf(pdf_bytes: bytes):
         return None
 
 
+def _limpiar_json(respuesta_texto: str) -> str:
+    respuesta_texto = respuesta_texto.strip()
+    if respuesta_texto.startswith("```"):
+        lineas = respuesta_texto.split("\n")
+        respuesta_texto = "\n".join(lineas[1:-1])
+    inicio = respuesta_texto.find("{")
+    fin = respuesta_texto.rfind("}") + 1
+    if inicio >= 0 and fin > inicio:
+        respuesta_texto = respuesta_texto[inicio:fin]
+    return respuesta_texto
+
+
 async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
     prompt = PROMPT_TEXTO_PLANO.format(texto=texto[:8000])
     try:
@@ -127,10 +139,7 @@ async def _extraer_con_texto(texto: str, nombre_archivo: str) -> dict:
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}]
         )
-        respuesta_texto = message.content[0].text.strip()
-        if respuesta_texto.startswith("```"):
-            lineas = respuesta_texto.split("\n")
-            respuesta_texto = "\n".join(lineas[1:-1])
+        respuesta_texto = _limpiar_json(message.content[0].text)
         datos = json.loads(respuesta_texto)
         datos["nombre_archivo_original"] = nombre_archivo
         datos["metodo_extraccion"] = "texto_plano"
@@ -168,10 +177,7 @@ async def _extraer_con_vision(pdf_bytes: bytes, nombre_archivo: str) -> dict:
                 }
             ],
         )
-        respuesta_texto = message.content[0].text.strip()
-        if respuesta_texto.startswith("```"):
-            lineas = respuesta_texto.split("\n")
-            respuesta_texto = "\n".join(lineas[1:-1])
+        respuesta_texto = _limpiar_json(message.content[0].text)
         datos = json.loads(respuesta_texto)
         datos["nombre_archivo_original"] = nombre_archivo
         datos["metodo_extraccion"] = "vision_ia"
