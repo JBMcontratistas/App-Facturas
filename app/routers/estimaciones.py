@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.auth import require_cualquier_rol
 
-router = APIRouter(prefix="/estimaciones", tags=["estimaciones"])
+router = APIRouter(prefix="/api/estimaciones", tags=["estimaciones"])
 
 
 # ─── Schemas ────────────────────────────────────────────────────────────────
