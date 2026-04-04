@@ -177,9 +177,48 @@ async def guardar_factura(
         )
         db.add(asig)
 
+    # ── Actualizar catálogo de materiales con precios históricos ──────────
+    for item_data in datos.items:
+        if not item_data.categoria_id or not item_data.precio_unit_sin_igv:
+            continue
+        from sqlalchemy import text
+        nombre = item_data.descripcion.strip().lower()
+        precio = float(item_data.precio_unit_sin_igv)
+        # Buscar si ya existe en catálogo
+        res = await db.execute(
+            text("SELECT id, total_compras, precio_promedio FROM catalogo_materiales WHERE nombre_normalizado ILIKE :nombre AND categoria_id = :cat"),
+            {"nombre": nombre, "cat": item_data.categoria_id}
+        )
+        existente = res.fetchone()
+        if existente:
+            total = existente.total_compras or 0
+            promedio_actual = float(existente.precio_promedio or 0)
+            nuevo_promedio = ((promedio_actual * total) + precio) / (total + 1)
+            await db.execute(
+                text("""
+                    UPDATE catalogo_materiales
+                    SET ultima_compra_precio = :precio,
+                        precio_promedio = :promedio,
+                        total_compras = total_compras + 1,
+                        precio_minimo = LEAST(COALESCE(precio_minimo, :precio), :precio),
+                        precio_maximo = GREATEST(COALESCE(precio_maximo, :precio), :precio)
+                    WHERE id = :id
+                """),
+                {"precio": precio, "promedio": round(nuevo_promedio, 4), "id": existente.id}
+            )
+        else:
+            await db.execute(
+                text("""
+                    INSERT INTO catalogo_materiales
+                        (nombre_normalizado, categoria_id, unidad_estandar, precio_promedio,
+                         ultima_compra_precio, precio_minimo, precio_maximo, total_compras)
+                    VALUES (:nombre, :cat, :unidad, :precio, :precio, :precio, :precio, 1)
+                """),
+                {"nombre": nombre, "cat": item_data.categoria_id, "unidad": item_data.unidad, "precio": precio}
+            )
+
     await db.commit()
     return {"ok": True, "factura_id": factura.id, "mensaje": "Factura guardada correctamente"}
-
 
 @router.post("/subir-pdf/{factura_id}")
 async def subir_pdf(
