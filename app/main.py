@@ -6,7 +6,6 @@ from app.routers.otros import proyectos_router, proveedores_router
 from app.routers.reportes import router as reportes_router
 from app.routers.catalogo import router as catalogo_router
 from app.routers import estimaciones
-app.include_router(estimaciones.router)
 
 app = FastAPI(
     title="JBM Compras API",
@@ -29,6 +28,7 @@ app.include_router(proyectos_router)
 app.include_router(proveedores_router)
 app.include_router(catalogo_router)
 app.include_router(reportes_router)
+app.include_router(estimaciones.router)
 
 @app.get("/api/health")
 async def health_check():
